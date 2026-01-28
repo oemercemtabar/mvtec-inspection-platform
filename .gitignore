@@ -1,0 +1,21 @@
+# env files / secrets
+infra/env/*.env
+.env
+.env.*
+
+# python
+processor/.venv/
+processor/__pycache__/
+processor/**/__pycache__/
+processor/*.pyc
+
+# rails
+backend/log/
+backend/tmp/
+backend/storage/
+backend/.bundle/
+backend/vendor/bundle/
+
+# datasets (keep MVTec out of git)
+data/
+datasets/
