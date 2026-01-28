@@ -1,0 +1,95 @@
+name: mvtec-inspection
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: mvtec_postgres
+    environment:
+      POSTGRES_DB: mvtec_dev
+      POSTGRES_USER: mvtec
+      POSTGRES_PASSWORD: mvtec
+    ports:
+      - "5432:5432"
+    volumes:
+      - mvtec_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mvtec -d mvtec_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    container_name: mvtec_redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: mvtec_backend
+    env_file:
+      - ./env/backend.dev.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../backend:/app
+      - backend_bundle:/usr/local/bundle
+    command: >
+      bash -lc "
+      bundle install &&
+      bin/rails db:prepare &&
+      bin/rails server -b 0.0.0.0 -p 3000
+      "
+
+  processor_1:
+    build:
+      context: ../processor
+      dockerfile: Dockerfile
+    container_name: mvtec_processor_1
+    env_file:
+      - ./env/processor.dev.env
+    ports:
+      - "5001:5001"
+    volumes:
+      - ../processor:/app
+      - processor_cache:/cache
+    command: >
+      bash -lc "
+      pip install -r requirements.txt &&
+      uvicorn modules.endpoints.main:app --host 0.0.0.0 --port 5001
+      "
+
+  processor_2:
+    build:
+      context: ../processor
+      dockerfile: Dockerfile
+    container_name: mvtec_processor_2
+    env_file:
+      - ./env/processor.dev.env
+    ports:
+      - "5002:5002"
+    volumes:
+      - ../processor:/app
+      - processor_cache:/cache
+    command: >
+      bash -lc "
+      pip install -r requirements.txt &&
+      uvicorn modules.endpoints.main:app --host 0.0.0.0 --port 5002
+      "
+
+volumes:
+  mvtec_pgdata:
+  backend_bundle:
+  processor_cache:
